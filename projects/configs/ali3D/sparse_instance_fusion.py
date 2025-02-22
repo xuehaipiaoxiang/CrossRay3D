@@ -404,12 +404,12 @@ log_level = 'INFO'
 work_dir = None
 
 # load_from='ckpts/epoch_6_fusion_val.pth'
-load_from = './work_dirs/sparse_instance_fusion/latest.pth'
-# load_from = None
+# load_from = './work_dirs/sparse_instance_fusion/latest.pth'
+load_from = None
 # load_from='ckpts/nuscenes_res50_voxel_backbone.pth'
 
-# resume_from = 'ckpts/epoch_6_fusion_val.pth'
-resume_from = None
+resume_from = 'ckpts/epoch_6_fusion_val.pth'
+# resume_from = None
 
 workflow = [('train', 1)]
 gpu_ids = range(0, 8)

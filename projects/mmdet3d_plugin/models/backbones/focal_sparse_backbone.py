@@ -324,10 +324,10 @@ class FocalSparseBEVBackBone(nn.Module):
         labels_list = self.get_targets(gt_boxes, gt_centers, gt_labels, bev_shape, gt_volume)
 
         ################################### START slot to visualize labels & uncomment slot in Detector
-        # sample_weight = preds_dicts['sample_weight']
-        # cls_index = preds_dicts['cls_index']
+        sample_weight = preds_dicts['sample_weight']
+        cls_index = preds_dicts['cls_index']
         # try:
-        # multi_apply(self._visualize, raw_x, gt_centers, gt_boxes, sample_weight, cls_index, gt_labels) # for pre vis
+        multi_apply(self._visualize, raw_x, gt_centers, gt_boxes, sample_weight, cls_index, gt_labels) # for pre vis
         # multi_apply(self._visualize, raw_x, gt_centers, gt_boxes, labels_list) # for target vis
         # except:
         #     pass

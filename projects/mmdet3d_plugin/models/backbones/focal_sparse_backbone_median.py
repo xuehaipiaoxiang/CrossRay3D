@@ -304,10 +304,10 @@ class FocalSparseBEVBackBoneMedian(nn.Module):
         labels_list = self.get_targets(gt_boxes, gt_centers, gt_labels, bev_shape, gt_volume)
 
         ################################## START slot to visualize labels
-        # sample_weight = preds_dicts['sample_weight']
-        # cls_index = preds_dicts['cls_index']
+        sample_weight = preds_dicts['sample_weight']
+        cls_index = preds_dicts['cls_index']
         # try:
-        # multi_apply(self._visualize, raw_x, gt_centers, gt_boxes, sample_weight, cls_index, gt_labels, labels_list) # for pre vis
+        multi_apply(self._visualize, raw_x, gt_centers, gt_boxes, sample_weight, cls_index, gt_labels, labels_list) # for pre vis
         # except:
         #     pass
         ################################### END slot to visualize labels
@@ -622,6 +622,8 @@ class FocalSparseBEVBackBoneMedian(nn.Module):
         '''
         Modified by Huiming Yang
         '''
+        color_map = True
+        import cv2
         
         class_names = [
     'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
@@ -692,7 +694,7 @@ class FocalSparseBEVBackBoneMedian(nn.Module):
         #         lidar_o[:, 0],
         #         lidar_o[:, 1],
         #         s=1.0,
-        #         c="black",
+        #         c="white",
         #     )
 
         if weight is not None: #TODO  TOP-K select
@@ -705,12 +707,12 @@ class FocalSparseBEVBackBoneMedian(nn.Module):
             g_weight = torch.gather(weight, dim = 0, index = gather_index[:,None])
             color = OBJECT_PALETTE_tensor[cls_index.squeeze(-1)]
             num_lidar_point = g_weight.size(0)
-            num_lidar_point = int(num_lidar_point * 0.25) # reverse
+            num_lidar_point = int(num_lidar_point * 0.9) # reverse
             topk_index = torch.topk(g_weight, num_lidar_point, dim=0, largest=False)[1]
             gather_index = gather_index[:,None].repeat(1, 3)
             g_color = torch.gather(color, dim = 0, index = gather_index)
-            g_color = g_color.new_tensor((1, 0, 0)).repeat(g_color.size(0),1) # change color to red
-            g_color[topk_index.squeeze(-1)] = 1
+            g_color = g_color.new_tensor((1, 1, 1)).repeat(g_color.size(0),1) # change color to red
+            g_color[topk_index.squeeze(-1)] = 0
             g_color = g_color.cpu().numpy()
             plt.scatter(
                 lidar_o[:, 0],
@@ -719,17 +721,17 @@ class FocalSparseBEVBackBoneMedian(nn.Module):
                 c=g_color,
             )
 
-        if center_points is not None: #TODO center point
-            plt.scatter(
-                center_points[:, 0],
-                center_points[:, 1],
-                # s=600,
-                s=3,
-                # vmin=100,
-                # marker='o',
-                c="red",
-                # edgecolor='none',
-            )
+        # if center_points is not None: #TODO center point
+        #     plt.scatter(
+        #         center_points[:, 0],
+        #         center_points[:, 1],
+        #         # s=600,
+        #         s=3,
+        #         # vmin=100,
+        #         # marker='o',
+        #         c="red",
+        #         # edgecolor='none',
+        #     )
 
         # if bboxes is not None and len(bboxes) > 0: #TODO 2D box
         #     bboxes = torch.cat([bboxes, bboxes[:, [0], :]], dim=1)
@@ -743,16 +745,31 @@ class FocalSparseBEVBackBoneMedian(nn.Module):
         #             color=np.array(OBJECT_PALETTE[name]) / 255,
         #         )
 
+
         mmcv.mkdir_or_exist(os.path.dirname(fpath))
         fig.savefig(
             fpath,
             dpi=10,
-            facecolor="white",
+            facecolor="black",
             format="png",
             bbox_inches="tight",
             pad_inches=0,
         )
         plt.close()
+
+        if color_map:
+            old_img = cv2.imread(fpath)
+            color_weight = weight.sigmoid().reshape(180, 180).cpu().numpy()
+            color_weight =  (color_weight - color_weight.min()) /(color_weight.max() - color_weight.min())
+            color_weight *= 255
+            color_weight = color_weight.astype(np.uint8)
+            color_weight = np.flip(color_weight, axis=0)
+            color_weight = cv2.resize(color_weight, old_img.shape[:2])
+            heat_map = cv2.applyColorMap(color_weight, cv2.COLORMAP_JET)
+            heat_map = heat_map.clip(min=80, max=235)
+            # cv2.imwrite("vis/pictures_foreground/LiDAR/heatmap1" + str(i) +".png", heat_map* 0.9)
+            cv2.imwrite("vis/pictures_foreground/LiDAR/heatmap2" + str(i) +".png", heat_map* 0.9 +old_img *0.9 )
+
 
 
 

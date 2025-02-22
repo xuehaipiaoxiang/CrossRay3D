@@ -105,7 +105,7 @@ class Ali3DDetector(MVXTwoStageDetector):
         voxel_features = self.pts_voxel_encoder(voxels, num_points, coors,)
         batch_dict = dict(voxel_features=voxel_features, voxel_coords=coors, batch_size=coors[-1,0]+1)
         out_dict = self.pts_backbone(batch_dict)
-        # out_dict['raw_x'] = pts # slot for pts 
+        out_dict['raw_x'] = pts # slot for pts 
         return out_dict
 
 
@@ -148,7 +148,7 @@ class Ali3DDetector(MVXTwoStageDetector):
         
         if  pts_dict is not None and pts_dict['topk_indexes'] is not None :
             loss_focal_pillar= self.pts_backbone.loss(pts_dict, img_metas,
-                                                    #   raw_x = pts_dict['raw_x'], # slot for pts 
+                                                      raw_x = pts_dict['raw_x'], # slot for pts 
                                                        )
             if loss_focal_pillar is not None:
                 losses.update(loss_focal_pillar)
