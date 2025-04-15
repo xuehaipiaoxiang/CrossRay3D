@@ -44,7 +44,7 @@ git checkout v1.0.0rc6
 pip install -e .
 ```
 
-**f. Train CR3D in fusion manner.  **
+**f. Train CR3D in fusion manner.**
 ```
 python ./bash/dist_train.sh ./project/sparse_image.py 2 # firstly 
 python ./bash/dist_train.sh ./project/sparse_lidar.py 2 # then
