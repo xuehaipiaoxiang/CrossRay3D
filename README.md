@@ -36,6 +36,17 @@ pip install flash-attn==0.2.2
 **e. Install mmdet3d.**
 ```shell
 pip install mmcv-full==1.6.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.0/index.html
+
+**f. Train CR3D in fusion manner  **
+```
+python ./bash/dist_train.sh ./project/sparse_image.py 2 # firstly 
+python ./bash/dist_train.sh ./project/sparse_lidar.py 2 # then
+# merge  weight from image and lidar
+python ./bash/dist_train.sh ./project/sparse_fusion.py 2 # finally
+```
+
+
+
 pip install mmdet==2.28.2
 pip install mmsegmentation==0.30.0
 git clone https://github.com/open-mmlab/mmdetection3d.git
