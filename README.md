@@ -43,11 +43,10 @@ cd mmdetection3d
 git checkout v1.0.0rc6 
 pip install -e .
 ```
-
 **f. Train CR3D in fusion manner.**
 ```
-python ./bash/dist_train.sh ./project/sparse_image.py 2 # firstly 
-python ./bash/dist_train.sh ./project/sparse_lidar.py 2 # then
-merge  weight from image and lidar
-python ./bash/dist_train.sh ./project/sparse_fusion.py 2 # finally
+python ./bash/dist_train.sh ./project/configs/ali3D/sparse_instance_image.py 8 # firstly 
+python ./bash/dist_train.sh ./project/configs/ali3D/sparse_instance_lidar.py 8 # then
+python  ./tool/merge.py  # merge  image and lidar weight 
+python ./bash/dist_train.sh ./project/configs/ali3Dsparse_instance/fusion.py 8 # train from merge weight
 ```
