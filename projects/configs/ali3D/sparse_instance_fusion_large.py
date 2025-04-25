@@ -400,14 +400,9 @@ dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = None
 
-# load_from='ckpts/pre_fusion_large.pth'
-# load_from = 'ckpts/epoch_4_fusion_large_test.pth'
 load_from = None
-# load_from='ckpts/nuscenes_maskrcnn_res50_voxel_backbone.pth'
+resume_from = None
 
-# resume_from = './work_dirs/sparse_instance_fusion_large/latest.pth'
-# resume_from = None
-resume_from = 'ckpts/epoch_4_fusion_large_test.pth'
 
 
 workflow = [('train', 1)]
