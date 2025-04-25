@@ -1,0 +1,9 @@
+# ninja log v5
+0	736	1704856099230825633	/root/CMT/projects/mmdet3d_plugin/models/ops/build/temp.linux-x86_64-cpython-38/root/CMT/projects/mmdet3d_plugin/models/ops/roi_aware_pool3d/src/roiaware_pool3d_kernel.o	8605774314110b07
+0	15814	1704856114295302104	/root/CMT/projects/mmdet3d_plugin/models/ops/build/temp.linux-x86_64-cpython-38/root/CMT/projects/mmdet3d_plugin/models/ops/roi_aware_pool3d/src/roiaware_pool3d.o	8b31eabd880237a3
+23	20056	1714886940267581397	/root/CMT/projects/mmdet3d_plugin/models/ops/build/temp.linux-x86_64-cpython-38/root/CMT/projects/mmdet3d_plugin/models/ops/roi_aware_pool3d/src/roiaware_pool3d.o	8b31eabd880237a3
+21	1007	1714887261997393125	/root/CMT/projects/mmdet3d_plugin/models/ops/build/temp.linux-x86_64-cpython-38/root/CMT/projects/mmdet3d_plugin/models/ops/roi_aware_pool3d/src/roiaware_pool3d_kernel.o	8605774314110b07
+22	873	1714916307719035826	/root/CMT/projects/mmdet3d_plugin/models/ops/build/temp.linux-x86_64-cpython-38/root/CMT/projects/mmdet3d_plugin/models/ops/roi_aware_pool3d/src/roiaware_pool3d_kernel.o	8605774314110b07
+16	840	1714971233653738236	/root/CMT/projects/mmdet3d_plugin/models/ops/build/temp.linux-x86_64-cpython-38/root/CMT/projects/mmdet3d_plugin/models/ops/roi_aware_pool3d/src/roiaware_pool3d_kernel.o	8605774314110b07
+21	922	1717572175549375303	/root/CMT/projects/mmdet3d_plugin/models/ops/build/temp.linux-x86_64-cpython-38/root/CMT/projects/mmdet3d_plugin/models/ops/roi_aware_pool3d/src/roiaware_pool3d_kernel.o	8605774314110b07
+24	937	1718274883055909216	/root/CMT/projects/mmdet3d_plugin/models/ops/build/temp.linux-x86_64-cpython-38/root/CMT/projects/mmdet3d_plugin/models/ops/roi_aware_pool3d/src/roiaware_pool3d_kernel.o	8605774314110b07
