@@ -1,5 +1,5 @@
 <p float="left">
-  <img src="su.png?raw=true" width="37.25%" />
+  <img src="su.png?raw=true" width="80%" />
 </p>
 
 
