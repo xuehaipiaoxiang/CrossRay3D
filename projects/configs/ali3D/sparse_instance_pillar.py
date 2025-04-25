@@ -346,17 +346,10 @@ log_level = 'INFO'
 work_dir = None
 
 
-# load_from='ckpts/nuscenes_res50_voxel_backbone.pth'
-# load_from='ckpts/nuscenes_maskrcnn_res50_voxel_backbone.pth'
+
 load_from = 'ckpts/epoch_1_lidar_val.pth'
-# load_from = 'work_dirs/sparse_instance_pillar/latest.pth'
-# load_from = 'ckpts/epoch_16_lidar_test.pth'
-# load_from=None
-
-
 resume_from = None
-# resume_from = 'work_dirs/sparse_instance_pillar/latest.pth'
-# resume_from = 'ckpts/epoch_15_LiDAR.pth'
+
 
 
 workflow = [('train', 1)]
