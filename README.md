@@ -1,3 +1,8 @@
+<p float="left">
+  <img src="su.png?raw=true" width="37.25%" />
+</p>
+
+
 # Environment Setup
 
 ## Base Environments  
