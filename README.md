@@ -60,6 +60,6 @@ pip install -e .
 ```
 python ./bash/dist_train.sh ./project/configs/ali3D/sparse_instance_image.py 8 # firstly 
 python ./bash/dist_train.sh ./project/configs/ali3D/sparse_instance_lidar.py 8 # then
-python  ./tool/merge.py  ./works/sparse_instance_image/latest.pth ./works/sparse_instance_lidar/latest.pth .# the scripy will be release soon
+python  ./tool/merge.py  ./works/sparse_instance_image/latest.pth ./works/sparse_instance_lidar/latest.pth 
 python ./bash/dist_train.sh ./project/configs/ali3Dsparse_instance/fusion.py 8 # train from merge weight
 ```
