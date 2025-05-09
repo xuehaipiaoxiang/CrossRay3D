@@ -38,8 +38,6 @@ ida_aug_conf = {
         "rand_flip": True,
     }
 
-
-
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',
@@ -56,46 +54,46 @@ train_pipeline = [
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True,
         with_bbox=True, with_label=True, with_bbox_depth=True),
 
-    # dict(
-    #     type='UnifiedObjectSample',
-    #     sample_2d=True,
-    #     mixup_rate=0.5,
-    #     db_sampler=dict(
-    #         type='UnifiedDataBaseSampler',
-    #         data_root = 'data/nuscenes/',    
-    #         info_path=data_root + 'nuscenes_dbinfos_train.pkl',
-    #         rate=1.0,
-    #         prepare=dict(
-    #             filter_by_difficulty=[-1],
-    #             filter_by_min_points=dict(
-    #                 car=5,
-    #                 truck=5,
-    #                 bus=5,
-    #                 trailer=5,
-    #                 construction_vehicle=5,
-    #                 traffic_cone=5,
-    #                 barrier=5,
-    #                 motorcycle=5,
-    #                 bicycle=5,
-    #                 pedestrian=5)),
-    #         classes=class_names,
-    #         sample_groups=dict(
-    #             car=2,
-    #             truck=3,
-    #             construction_vehicle=7,
-    #             bus=4,
-    #             trailer=6,
-    #             barrier=2,
-    #             motorcycle=6,
-    #             bicycle=6,
-    #             pedestrian=2,
-    #             traffic_cone=2),
-    #         points_loader=dict(
-    #             type='LoadPointsFromFile',
-    #             coord_type='LIDAR',
-    #             load_dim=5,
-    #             use_dim=[0, 1, 2, 3, 4],
-    #         ))),
+    dict(
+        type='UnifiedObjectSample',
+        sample_2d=True,
+        mixup_rate=0.5,
+        db_sampler=dict(
+            type='UnifiedDataBaseSampler',
+            data_root = 'data/nuscenes/',    
+            info_path=data_root + 'nuscenes_dbinfos_train.pkl',
+            rate=1.0,
+            prepare=dict(
+                filter_by_difficulty=[-1],
+                filter_by_min_points=dict(
+                    car=5,
+                    truck=5,
+                    bus=5,
+                    trailer=5,
+                    construction_vehicle=5,
+                    traffic_cone=5,
+                    barrier=5,
+                    motorcycle=5,
+                    bicycle=5,
+                    pedestrian=5)),
+            classes=class_names,
+            sample_groups=dict(
+                car=2,
+                truck=3,
+                construction_vehicle=7,
+                bus=4,
+                trailer=6,
+                barrier=2,
+                motorcycle=6,
+                bicycle=6,
+                pedestrian=2,
+                traffic_cone=2),
+            points_loader=dict(
+                type='LoadPointsFromFile',
+                coord_type='LIDAR',
+                load_dim=5,
+                use_dim=[0, 1, 2, 3, 4],
+            ))),
     
     dict(
         type='GlobalRotScaleTransAll',
@@ -242,7 +240,26 @@ model = dict(
         type='TopkLoss',
         loss_weight=1.0), 
     ),
-
+    # img_roi_head=dict( # for auxiliary supervision only
+    #     type='YOLOXHeadCustom',
+    #     num_classes=10,
+    #     in_channels=256,
+    #     strides=[8, 16, 32, 64],
+    #     train_cfg=dict(assigner=dict(type='SimOTAAssigner', center_radius=2.5)),
+    #     test_cfg=dict(score_thr=0.01, nms=dict(type='nms', iou_threshold=0.65)),),
+    depth_branch=dict( # for auxiliary supervision only
+        type='MyDepthSegHead',
+        scale_num=4,
+        keep_threshold=0.1,
+        grid_config=grid_config,
+        input_size=ida_aug_conf['final_dim'],
+        depth_loss_cfg=dict(alpha=0.25, gamma=2),
+        fg_loss_cfg=dict(alpha=0.25, gamma=2),
+        ins_channels=[256, 256, 256, 256],
+        depthnet_cfg=dict(use_dcn=False, aspp_mid_channels=96),
+        loss_depth_weight=[37, 75, 150, 300],
+        loss_fg_weight=[8, 16, 33, 67],
+        downsamples=[64, 32, 16, 8]),
     pts_voxel_layer=dict(
         num_point_features=5,
         max_num_points=10,
