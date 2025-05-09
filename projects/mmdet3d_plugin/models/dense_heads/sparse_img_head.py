@@ -209,51 +209,105 @@ class SparseImgHead(BaseModule):
 
         return coords_3d
 
-
     def prepare_for_dn(self, batch_size, reference_points, img_metas):
-        if self.training:
+        data = img_metas
+        if self.training and self.with_dn:
             targets = [torch.cat((img_meta['gt_bboxes_3d']._data.gravity_center, img_meta['gt_bboxes_3d']._data.tensor[:, 3:]),dim=1) for img_meta in img_metas ]
             labels = [img_meta['gt_labels_3d']._data for img_meta in img_metas ]
             known = [(torch.ones_like(t)).cuda() for t in labels]
             know_idx = known
             unmask_bbox = unmask_label = torch.cat(known)
+            #gt_num
             known_num = [t.size(0) for t in targets]
+        
             labels = torch.cat([t for t in labels])
             boxes = torch.cat([t for t in targets])
             batch_idx = torch.cat([torch.full((t.size(0), ), i) for i, t in enumerate(targets)])
-
+        
             known_indice = torch.nonzero(unmask_label + unmask_bbox)
             known_indice = known_indice.view(-1)
             # add noise
-            groups = min(self.scalar, self.num_query // max(known_num))
-            known_indice = known_indice.repeat(groups, 1).view(-1)
-            known_labels = labels.repeat(groups, 1).view(-1).long().to(reference_points.device)
-            known_labels_raw = labels.repeat(groups, 1).view(-1).long().to(reference_points.device)
-            known_bid = batch_idx.repeat(groups, 1).view(-1)
-            known_bboxs = boxes.repeat(groups, 1).to(reference_points.device)
+            total_raydn_num = self.raydn_num * self.raydn_group
+            known_indice = known_indice.repeat(self.scalar+total_raydn_num, 1).view(-1)
+            known_labels = labels.repeat(self.scalar, 1).view(-1).long().to(reference_points.device)
+            known_bid = batch_idx.repeat(self.scalar+total_raydn_num, 1).view(-1)
+            known_bboxs = boxes.repeat(self.scalar, 1).to(reference_points.device)
             known_bbox_center = known_bboxs[:, :3].clone()
             known_bbox_scale = known_bboxs[:, 3:6].clone()
-            
+
             if self.bbox_noise_scale > 0:
                 diff = known_bbox_scale / 2 + self.bbox_noise_trans
                 rand_prob = torch.rand_like(known_bbox_center) * 2 - 1.0
                 known_bbox_center += torch.mul(rand_prob,
                                             diff) * self.bbox_noise_scale
-                known_bbox_center[..., 0:1] = (known_bbox_center[..., 0:1] - self.pc_range[0]) / (self.pc_range[3] - self.pc_range[0])
-                known_bbox_center[..., 1:2] = (known_bbox_center[..., 1:2] - self.pc_range[1]) / (self.pc_range[4] - self.pc_range[1])
-                known_bbox_center[..., 2:3] = (known_bbox_center[..., 2:3] - self.pc_range[2]) / (self.pc_range[5] - self.pc_range[2])
+                known_bbox_center[..., 0:3] = (known_bbox_center[..., 0:3] - self.pc_range[0:3]) / (self.pc_range[3:6] - self.pc_range[0:3])
+
                 known_bbox_center = known_bbox_center.clamp(min=0.0, max=1.0)
                 mask = torch.norm(rand_prob, 2, 1) > self.split
-                known_labels[mask] = sum(self.num_classes)
+                known_labels[mask] = self.num_classes
+            
+           # Ray Denoising
+            for g_id in range(self.raydn_group):
+                raydn_known_labels = labels.repeat(self.raydn_num, 1).view(-1).long().to(reference_points.device)
+                raydn_known_bboxs = boxes.repeat(self.raydn_num, 1).to(reference_points.device)
+                raydn_known_bbox_center = raydn_known_bboxs[:, :3].clone()
+                raydn_known_bbox_scale = raydn_known_bboxs[:, 3:6].clone()
+                noise_scale = raydn_known_bbox_scale[:, :].mean(dim=-1) / 2
+                noise_step = (self.raydn_sampler.sample([noise_scale.shape[0]]).to(reference_points.device) * 2 - 1.0) * self.raydn_radius
+
+                noise_scale = noise_scale.view(self.raydn_num, -1)
+                noise_step = noise_step.view(self.raydn_num, -1)
+                min_value, min_index = noise_step.abs().min(dim=0)
+                reset_mask = min_value.abs() > self.split
+                reset_value = (torch.rand(reset_mask.sum()).to(reference_points.device) * 2 - 1) * self.split     
+                min_value[reset_mask] = reset_value           
+                noise_step.scatter_(0, min_index.unsqueeze(0), min_value.unsqueeze(0))
+                mask = torch.zeros_like(noise_step)
+                mask.scatter_(0, min_index.unsqueeze(0), 1)
+                mask = mask < 1
+                mask = mask.view(-1)
+                raydn_known_labels[mask] = self.num_classes
+
+                raydn_known_bbox_center = raydn_known_bbox_center.view(self.raydn_num, -1, 3)
+                ori_raydn_known_bbox_center = raydn_known_bbox_center.clone()
+                for view_id in range(data['lidar2img'].shape[1]):
+                    raydn_known_bbox_center_copy = torch.cat([ori_raydn_known_bbox_center.clone(), ori_raydn_known_bbox_center.new_ones((ori_raydn_known_bbox_center.shape[0], ori_raydn_known_bbox_center.shape[1], 1))], dim=-1)
+                    tmp_p = raydn_known_bbox_center_copy.new_zeros(raydn_known_bbox_center_copy.shape)
+                    for batch_id in range(data['lidar2img'].shape[0]):
+                        tmp_p[:, sum(known_num[:batch_id]): sum(known_num[:batch_id+1])] = (data['lidar2img'][batch_id][view_id] @ raydn_known_bbox_center_copy[:, sum(known_num[:batch_id]): sum(known_num[:batch_id+1])].permute(0, 2, 1)).permute(0, 2, 1)
+
+                    z_mask = tmp_p[..., 2] > 0 # depth > 0
+                    tmp_p[..., :2] = tmp_p[..., :2] / (tmp_p[..., 2:3] + z_mask.unsqueeze(-1) * 1e-6 - (~z_mask).unsqueeze(-1) * 1e-6)
+                    pad_h, pad_w = img_metas[0]['pad_shape'][0][:2] #(320, 800) #(640, 1600)
+                    hw_mask = (
+                        (tmp_p[..., 0] < pad_w)
+                        & (tmp_p[..., 0] >= 0)
+                        & (tmp_p[..., 1] < pad_h)
+                        & (tmp_p[..., 1] >= 0)
+                    ) # 0 < u < h and 0 < v < w
+                    valid_mask = torch.logical_and(hw_mask, z_mask)
+                    tmp_p[..., 2] += noise_scale*noise_step
+                    tmp_p[..., :2] = tmp_p[..., :2] * tmp_p[..., 2:3]
+                    proj_back = raydn_known_bbox_center_copy.new_zeros(raydn_known_bbox_center_copy.shape)
+                    for batch_id in range(data['lidar2img'].shape[0]):
+                        proj_back[:, sum(known_num[:batch_id]): sum(known_num[:batch_id+1])] = (data['lidar2img'][batch_id][view_id].inverse() @ tmp_p[:, sum(known_num[:batch_id]): sum(known_num[:batch_id+1])].permute(0, 2, 1)).permute(0, 2, 1)
+                    raydn_known_bbox_center[valid_mask.unsqueeze(-1).repeat(1, 1, 3)] = proj_back[..., :3][valid_mask.unsqueeze(-1).repeat(1, 1, 3)]
+                raydn_known_bbox_center = raydn_known_bbox_center.view(-1, 3)
+                raydn_known_bbox_center[..., 0:3] = (raydn_known_bbox_center[..., 0:3] - self.pc_range[0:3]) / (self.pc_range[3:6] - self.pc_range[0:3])
+                raydn_known_bbox_center = raydn_known_bbox_center.clamp(min=0.0, max=1.0)
+                
+                known_labels = torch.cat([known_labels, raydn_known_labels], dim=0)
+                known_bbox_center = torch.cat([known_bbox_center, raydn_known_bbox_center], dim=0)
+            known_bboxs = boxes.repeat(self.scalar+total_raydn_num, 1).to(reference_points.device)
 
             single_pad = int(max(known_num))
-            pad_size = int(single_pad * groups)
+            pad_size = int(single_pad * (self.scalar+total_raydn_num))
             padding_bbox = torch.zeros(pad_size, 3).to(reference_points.device)
             padded_reference_points = torch.cat([padding_bbox, reference_points], dim=0).unsqueeze(0).repeat(batch_size, 1, 1)
 
             if len(known_num):
                 map_known_indice = torch.cat([torch.tensor(range(num)) for num in known_num])  # [1,2, 1,2,3]
-                map_known_indice = torch.cat([map_known_indice + single_pad * i for i in range(groups)]).long()
+                map_known_indice = torch.cat([map_known_indice + single_pad * i for i in range(self.scalar+total_raydn_num)]).long()
             if len(known_bid):
                 padded_reference_points[(known_bid.long(), map_known_indice)] = known_bbox_center.to(reference_points.device)
 
@@ -262,21 +316,31 @@ class SparseImgHead(BaseModule):
             # match query cannot see the reconstruct
             attn_mask[pad_size:, :pad_size] = True
             # reconstruct cannot see each other
-            for i in range(groups):
+            for i in range(self.scalar):
                 if i == 0:
                     attn_mask[single_pad * i:single_pad * (i + 1), single_pad * (i + 1):pad_size] = True
-                if i == groups - 1:
-                    attn_mask[single_pad * i:single_pad * (i + 1), :single_pad * i] = True
+                # if i == self.scalar - 1:
+                #     attn_mask[single_pad * i:single_pad * (i + 1), :single_pad * i] = True
                 else:
                     attn_mask[single_pad * i:single_pad * (i + 1), single_pad * (i + 1):pad_size] = True
                     attn_mask[single_pad * i:single_pad * (i + 1), :single_pad * i] = True
+            for i in range(self.raydn_group):
+                attn_mask[single_pad * (self.scalar + i*self.raydn_num):single_pad * (self.scalar + (i + 1)*self.raydn_num), single_pad * (self.scalar + (i + 1)*self.raydn_num):pad_size] = True
+                attn_mask[single_pad * (self.scalar + i*self.raydn_num):single_pad * (self.scalar + (i + 1)*self.raydn_num), :single_pad * (self.scalar + i*self.raydn_num)] = True
+
+            # update dn mask for temporal modeling
+            query_size = pad_size + self.num_query + self.num_propagated
+            tgt_size = pad_size + self.num_query + self.memory_len
+            temporal_attn_mask = torch.ones(query_size, tgt_size).to(reference_points.device) < 0
+            temporal_attn_mask[:attn_mask.size(0), :attn_mask.size(1)] = attn_mask 
+            temporal_attn_mask[pad_size:, :pad_size] = True
+            attn_mask = temporal_attn_mask
 
             mask_dict = {
                 'known_indice': torch.as_tensor(known_indice).long(),
                 'batch_idx': torch.as_tensor(batch_idx).long(),
                 'map_known_indice': torch.as_tensor(map_known_indice).long(),
                 'known_lbs_bboxes': (known_labels, known_bboxs),
-                'known_labels_raw': known_labels_raw,
                 'know_idx': know_idx,
                 'pad_size': pad_size
             }
@@ -287,7 +351,6 @@ class SparseImgHead(BaseModule):
             mask_dict = None
 
         return padded_reference_points, attn_mask, mask_dict
-
 
     def _bev_query_embed(self, ref_points):
         bev_embeds = self.bev_embedding(pos2embed(ref_points, num_pos_feats=self.hidden_dim))
