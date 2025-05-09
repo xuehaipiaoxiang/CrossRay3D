@@ -22,7 +22,7 @@ mmdet3d == 1.0.0rc6 \
 Following https://mmdetection3d.readthedocs.io/en/latest/getting_started.html#installation
 
 ## Download segmentation dataset
- Download nuScenes-map-expansion-v1.2.zip [HERE](https://www.nuscenes.org/download) and put it under `t-Denoising/data/nuscenes/`. Merge it to original nuScenes dataset by running unzip nuScenes-map-expansion-v1.2.zip
+ Download nuScenes-map-expansion-v1.2.zip [HERE](https://www.nuscenes.org/download) and put it under `./data/nuscenes/`. Merge it to original nuScenes dataset by running unzip nuScenes-map-expansion-v1.2.zip
 
 The fold `samples_instance_mask`  includes the instance masks of nuScenes images, which are predicted by the [HTC model](configs/nuimages/htc_x101_64x4d_fpn_dconv_c3-c5_coco-20e_16x1_20e_nuim.py) pretrained on nuImages dataset. The prepared data can be downloaded [HERE](https://drive.google.com/drive/folders/1VcWBwf_mjrCLTQazl7QdS6AGjnW6ALaA?usp=sharing).
 
