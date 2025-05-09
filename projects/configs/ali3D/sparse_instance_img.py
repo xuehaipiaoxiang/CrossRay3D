@@ -170,7 +170,26 @@ model = dict(
         type='TopkLoss',
         loss_weight=1.0), 
     ),
-
+    # img_roi_head=dict( # for auxiliary supervision only
+    #     type='YOLOXHeadCustom',
+    #     num_classes=10,
+    #     in_channels=256,
+    #     strides=[8, 16, 32, 64],
+    #     train_cfg=dict(assigner=dict(type='SimOTAAssigner', center_radius=2.5)),
+    #     test_cfg=dict(score_thr=0.01, nms=dict(type='nms', iou_threshold=0.65)),),
+    depth_branch=dict( # for auxiliary supervision only
+        type='MyDepthSegHead',
+        scale_num=4,
+        keep_threshold=0.1,
+        grid_config=grid_config,
+        input_size=ida_aug_conf['final_dim'],
+        depth_loss_cfg=dict(alpha=0.25, gamma=2),
+        fg_loss_cfg=dict(alpha=0.25, gamma=2),
+        ins_channels=[256, 256, 256, 256],
+        depthnet_cfg=dict(use_dcn=False, aspp_mid_channels=96),
+        loss_depth_weight=[37, 75, 150, 300],
+        loss_fg_weight=[8, 16, 33, 67],
+        downsamples=[64, 32, 16, 8]),
     pts_bbox_head=dict(
         type='SparseImgHead',
         in_channels=256,
