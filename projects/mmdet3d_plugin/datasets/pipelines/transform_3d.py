@@ -20,6 +20,110 @@ from mmdet3d.core.bbox import box_np_ops
 from mmdet3d.datasets.builder import OBJECTSAMPLERS
 
 
+
+@PIPELINES.register_module()
+class LoadMultiViewSeg(object):
+    """Load multi channel images from a list of separate channel files.
+
+    Expects results['img_filename'] to be a list of filenames.
+
+    Args:
+        to_float32 (bool, optional): Whether to convert the img to float32.
+            Defaults to False.
+        color_type (str, optional): Color type of the file.
+            Defaults to 'unchanged'.
+    """
+
+    def __init__(self, with_seg=True):
+        self.with_seg = with_seg
+        self.cam_names = [
+        'CAM_FRONT_LEFT', 'CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_BACK_LEFT',
+        'CAM_BACK', 'CAM_BACK_RIGHT']
+
+    def __call__(self, results):
+        if self.with_seg == False:
+            return results
+        cam_names = self.cam_names
+        results['cam_names'] = cam_names
+        masks = []
+        gt_depth = []
+        for i, cam_name in enumerate(cam_names):
+            filename = results['img_filename'][i]
+            mask_filename = filename.replace('samples/', 'samples_instance_mask/')[:-4]+'.pt'
+            mask = self.get_mask(mask_filename)
+            masks.append(mask)
+            point_filename = filename.replace('samples/', 'samples_point_label/'
+                                            ).replace('.jpg','.npy')
+            point_label = np.load(point_filename).astype(np.float64)[:4].T
+            gt_depth.append(point_label)
+        results['gt_fg'] = masks
+        results['gt_depth'] = gt_depth
+        return results
+
+    def get_mask(self, mask_filename, img_shape=(900,1600)):
+        if not os.path.exists(mask_filename):
+            return Image.fromarray(np.zeros(img_shape, dtype=np.float32))
+        mask_preds = torch.load(mask_filename, map_location='cpu')    
+        mask_pred = mask_preds['masks'].float() / 255
+        bboxes = mask_preds['bboxes'][:,:4]
+        labels = mask_preds['labels']
+        N = len(mask_pred)
+        img_h, img_w = img_shape
+        im_mask = torch.zeros(img_h, img_w, dtype=torch.float32)
+        for i in range(N):
+            masks_chunk, spatial_inds = self._do_paste_mask(mask_pred[i:i+1], bboxes[i:i+1], img_h, img_w, skip_empty=True)
+            im_mask[spatial_inds] += masks_chunk.squeeze(0)
+        mask = Image.fromarray(im_mask.numpy())
+        return mask
+
+    def _do_paste_mask(self, masks, boxes, img_h, img_w, skip_empty=True):
+        device = masks.device
+        if skip_empty:
+            x0_int, y0_int = torch.clamp(
+                boxes.min(dim=0).values.floor()[:2] - 1,
+                min=0).to(dtype=torch.int32)
+            x1_int = torch.clamp(
+                boxes[:, 2].max().ceil() + 1, max=img_w).to(dtype=torch.int32)
+            y1_int = torch.clamp(
+                boxes[:, 3].max().ceil() + 1, max=img_h).to(dtype=torch.int32)
+        else:
+            x0_int, y0_int = 0, 0
+            x1_int, y1_int = img_w, img_h
+        x0, y0, x1, y1 = torch.split(boxes, 1, dim=1)  # each is Nx1
+
+        N = masks.shape[0]
+
+        img_y = torch.arange(y0_int, y1_int, device=device).to(torch.float32) + 0.5
+        img_x = torch.arange(x0_int, x1_int, device=device).to(torch.float32) + 0.5
+        img_y = (img_y - y0) / (y1 - y0) * 2 - 1
+        img_x = (img_x - x0) / (x1 - x0) * 2 - 1
+        # img_x, img_y have shapes (N, w), (N, h)
+        # IsInf op is not supported with ONNX<=1.7.0
+        if not torch.onnx.is_in_onnx_export():
+            if torch.isinf(img_x).any():
+                inds = torch.where(torch.isinf(img_x))
+                img_x[inds] = 0
+            if torch.isinf(img_y).any():
+                inds = torch.where(torch.isinf(img_y))
+                img_y[inds] = 0
+
+        gx = img_x[:, None, :].expand(N, img_y.size(1), img_x.size(1))
+        gy = img_y[:, :, None].expand(N, img_y.size(1), img_x.size(1))
+        grid = torch.stack([gx, gy], dim=3)
+
+        img_masks = F.grid_sample(
+            masks.to(dtype=torch.float32), grid, align_corners=False)
+
+        if skip_empty:
+            return img_masks[:, 0], (slice(y0_int, y1_int), slice(x0_int, x1_int))
+        else:
+            return img_masks[:, 0], ()
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        repr_str = 'Instance Segmentation'
+        return repr_str
+
 @PIPELINES.register_module()
 class PadMultiViewImage(object):
     """Pad the multi-view image.
